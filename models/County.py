@@ -74,15 +74,17 @@ def subdivisions(statefp, countyfp, conn):
     ret = {
         "state": {
             "id": state_id,
-            "county": county_id,
-            "subdivisions": [],
+            "county": {
+                "id": county_id,
+                "subdivisions": [],
+            }
         }
     }
 
     cur = conn.cursor()
     cur.execute(sql, {"statefp": statefp, "countyfp": countyfp}); 
     for row in cur:
-        ret['state']['subdivisions'].append(county_id + "/subdivision/" + row[1])
+        ret['state']['county']['subdivisions'].append(county_id + "/subdivision/" + row[1])
 
     return ret
 def upper_house_districts(statefp, countyfp, conn):
