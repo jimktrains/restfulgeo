@@ -77,7 +77,7 @@ application = tornado.web.Application([
     (r"^/state/(?P<statefp>\d+)/(?P<lookup>upper-house-district)/(?P<sldust>\d+)(?P<extra>/(?P<method>.+))?$", GeoHandler,dict(conn=conn)),
     (r"^/state/(?P<statefp>\d+)/(?P<lookup>school-district)/(?P<unsdlea>\d+)(?P<extra>/(?P<method>.+))?$", GeoHandler,dict(conn=conn)),
     (r"^/(?P<lookup>state)/(?P<statefp>\d+)(?P<extra>/(?P<method>.+))?$", GeoHandler,dict(conn=conn)),
-    (r"^/(?P<key>lsad|mtfcc)(?P<extra>/(?P<val>.*))?", FIPSHandler)
+    (r"^/(?P<key>funcstat|classfp|lsad|mtfcc)(?P<extra>/(?P<val>.*))?", FIPSHandler)
 ])
 
 application.listen(8000)
