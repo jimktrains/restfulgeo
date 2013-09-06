@@ -234,30 +234,6 @@ def get_county_subdivision(point):
 
     return ret
 
-def get_data(point):
-    cousub = get_county_subdivision(point)
-    sd = get_school_district(point)
-    lh = get_state_lower_house(point)
-    uh = get_state_upper_house(point)
-    cd = get_congressional_district(point)
-
-    ret = dmerge(cousub, sd)
-    ret = dmerge(ret, lh)
-    ret = dmerge(ret, uh)
-    ret = dmerge(ret, cd)
-
-    ret = rm_all_but_id(ret)
-
-    return ret
-
-def rm_all_but_id(a):
-    for k in list(a.keys()):
-        if isinstance(a[k], dict):
-            rm_all_but_id(a[k])
-        elif k != 'id':
-            del a[k]
-    return a
-
 def dmerge(a, b):
     for k, v in b.items():
         if isinstance(v, dict) and k in a:
@@ -266,17 +242,36 @@ def dmerge(a, b):
             a[k] = v 
     return a
 
-class PointLookup(tornado.web.RequestHandler):
-    def get(self, lat, lon):
-        point = (float(lat), float(lon))
-        ret = get_data(point)
+class Point():
+    @staticmethod
+    def lookup(lat, lon):
+        point = {"lat":float(lat), "lon":float(lon)}
+        ret = State.by_point(point)
+        ret = dmerge(ret, CD.by_point(point))
 
-        self.set_status(200)
-        self.set_header("Content-type", "application/json; charset=utf-8")
+        return ret
 
-        return self.write(json.dumps(ret))
+    @staticmethod
+    def methods():
+        return []
 
 class State:
+    @staticmethod
+    def by_point(point):
+        sql = "SELECT  statefp \
+              FROM  tl_2013_us_state \
+              WHERE ST_Contains(geom, ST_GeomFromText('POINT(%(lon)s %(lat)s)'))"
+        cur = conn.cursor()
+        cur.execute(sql, point); # PGis uses lon lat
+        row = cur.fetchone()
+
+        statefp = row[0]
+        state_id = "/state/" + statefp;
+        ret = {'state': { 'id': state_id } }
+
+        return ret
+    
+
     @staticmethod
     def lookup(statefp):
         sql = "SELECT region, division, statefp, statens, geoid, stusps, name, lsad, mtfcc, funcstat, aland, awater \
@@ -327,6 +322,22 @@ class State:
         return []
     
 class CD:
+    @staticmethod
+    def by_point(point):
+        sql = "SELECT  statefp, cd113fp \
+              FROM tl_rd13_42_cd113 \
+              WHERE ST_Contains(the_geom, ST_GeomFromText('POINT(%(lon)s %(lat)s)'))"
+        cur = conn.cursor()
+        cur.execute(sql, point); # PGis uses lon lat
+        row = cur.fetchone()
+
+        statefp = row[0]
+        cd113fp = row[1]
+        state_id = "/state/" + statefp;
+        cd113_id = state_id + "/congressional-district/" + cd113fp
+        ret = {'state': { 'id': state_id, "congressional-district": cd113_id } }
+
+        return ret
     @staticmethod
     def lookup(statefp, cd113fp):
         sql = "SELECT statefp, cd113fp, lsad, mtfcc, funcstat \
@@ -392,6 +403,8 @@ class GeoHandler(tornado.web.RequestHandler):
             klass = CD
         elif lookup == "state":
             klass = State
+        elif lookup == "point":
+            klass = Point
 
         if klass == None:
             ret = {"error_code": 400, "error": "How'd you get here?"}
@@ -415,7 +428,7 @@ FLOAT = "[-+]?\d+\.\d+"
 application = tornado.web.Application([
     (r"^/(?P<lookup>state)/(?P<statefp>\d+)(?P<extra>/(?P<method>.+))?$", GeoHandler),
     (r"^/state/(?P<statefp>\d+)/(?P<lookup>congressional-district)/(?P<cd113fp>\d+)(?P<extra>/(?P<method>.+))?$", GeoHandler),
-    (r"^/point/(?P<lat>"+FLOAT+")\s*,\s*(?P<lon>" + FLOAT + ")$", PointLookup),
+    (r"^/(?P<lookup>point)/(?P<lat>"+FLOAT+")\s*,\s*(?P<lon>" + FLOAT + ")(?P<extra>/(?P<method>.+))?$", GeoHandler),
 ])
 
 application.listen(8000)
