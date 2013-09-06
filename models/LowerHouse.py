@@ -28,10 +28,10 @@ def lookup(statefp, sldlst, conn):
            FROM tl_2013_42_sldl \
            WHERE statefp = %(statefp)s AND sldlst = %(sldlst)s"
     state_id = "/state/" + statefp
-    lh_id = state_id + "/lower-house-district/" + cd113fp
+    lh_id = state_id + "/lower-house-district/" + sldlst
     
     cur = conn.cursor()
-    cur.execute(sql, (statefp,cd113fp)); 
+    cur.execute(sql, {'statefp':statefp, 'sldlst':sldlst}); 
     row = cur.fetchone()
 
     lsad = row[2]
@@ -42,7 +42,7 @@ def lookup(statefp, sldlst, conn):
         'state': {
             "id": state_id,
             "lower-house-district": {
-                'id': cd113_id,
+                'id': lh_id,
                 'lsad': "/lsad/" + lsad,
                 'mtfcc': "/mtfcc/" + mtfcc,
                 'lsad': "/funcstat/" + funcstat,
