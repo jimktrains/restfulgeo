@@ -1,9 +1,9 @@
 import psycopg2
-import sys
-import http.server
-import socketserver
 import json
-import socket
+import re
+import tornado.ioloop
+import tornado.web
+
 
 PORT = 8000
 
@@ -266,20 +266,157 @@ def dmerge(a, b):
             a[k] = v 
     return a
 
-class HTTPHandler(http.server.BaseHTTPRequestHandler):
-    def do_GET(self):
-        point = [40.455025, -79.938073]
-        ret = json.dumps(get_data(point))
-        self.send_response(200)
-        self.send_header("Content-type", "application/json; charset=utf-8")
-        self.end_headers()
+class PointLookup(tornado.web.RequestHandler):
+    def get(self, lat, lon):
+        point = (float(lat), float(lon))
+        ret = get_data(point)
 
-        self.wfile.write(bytes(ret, 'UTF-8'))
+        self.set_status(200)
+        self.set_header("Content-type", "application/json; charset=utf-8")
 
-while 1:
-    try:
-        httpd = socketserver.TCPServer(("", PORT), HTTPHandler)
-        print("serving at port", PORT)
-        httpd.serve_forever()
-    except socket.error:
-        PORT += 1
+        return self.write(json.dumps(ret))
+
+class State:
+    @staticmethod
+    def lookup(statefp):
+        sql = "SELECT region, division, statefp, statens, geoid, stusps, name, lsad, mtfcc, funcstat, aland, awater \
+               FROM tl_2013_us_state \
+               WHERE statefp = %s"
+        statefp = str(statefp)
+        state_id = "/state/" + statefp
+        cur = conn.cursor()
+        cur.execute(sql, (statefp,)); 
+        row = cur.fetchone()
+
+        region = row[0]
+        division = row[1]
+        statefp = row[2]
+        statens = row[3]
+        geoid = row[4]
+        stusps = row[5]
+        name = row[6]
+        lsad = row[7]
+        mtfcc = row[8]
+        funcstat = row[9]
+        aland = row[10]
+        awater = row[11]
+
+        ret = {
+            'id': state_id,
+            'name': name,
+            'division': division,
+            'region': region,
+            'counties': state_id + "/county",
+            'school-districts': state_id + "/school-district",
+            'congressional-districts': state_id + "/congressional-district",
+            'lower-house-districts': state_id + "/lower-house-district",
+            'upper-house-districts': state_id + "/upper-house-district",
+            'area': {
+                'land': aland,
+                'water': awater,
+            },
+            'abbr':    stusps,
+            'mtfcc':    "/mtfcc/" + mtfcc,
+            'lsad':     "/lsad/" + lsad,
+            'functional_status': "/funcstat/" + funcstat,
+        }
+        return ret
+
+    @staticmethod
+    def methods():
+        return []
+    
+class CD:
+    @staticmethod
+    def lookup(statefp, cd113fp):
+        sql = "SELECT statefp, cd113fp, lsad, mtfcc, funcstat \
+               FROM tl_rd13_42_cd113 \
+               WHERE statefp = %s AND cd113fp = %s"
+        state_id = "/state/" + statefp
+        cd113_id = state_id + "/congressional-district/" + cd113fp
+        ret = {
+            'state': {
+                "id": state_id,
+                "congressional-district": {
+                    'id': cd113_id
+                },
+            }
+        }
+        
+        cur = conn.cursor()
+        cur.execute(sql, (statefp,cd113fp)); 
+        row = cur.fetchone()
+
+        lsad = row[2]
+        mtfcc = row[3]
+        funcstat = row[4]
+
+        ret['state']['congressional-district']['lsad'] = "/lsad/" + lsad
+        ret['state']['congressional-district']['mtfcc'] = "/mtfcc/" + mtfcc
+        ret['state']['congressional-district']['lsad'] = "/funcstat/" + funcstat
+
+        return ret
+
+    @staticmethod
+    def methods():
+        return ['counties']
+
+    @staticmethod
+    def counties(statefp, cd113fp):
+        sql = "SELECT cty.statefp, cty.countyfp \
+               FROM tl_2013_us_county AS cty, tl_rd13_42_cd113 as cd \
+               WHERE cd.cd113fp = %(cd113fp)s AND cd.statefp = %(statefp)s AND \
+                     ST_Intersects(cty.geom, cd.the_geom) AND NOT ST_Touches(cty.geom, cd.the_geom)"
+        state_id = "/state/" + statefp
+        cd113_id = state_id + "/congressional-district/" + cd113fp
+        ret = {
+            "state": {
+                "id": state_id,
+                "counties": [],
+                "congressional-district": cd113_id,
+            }
+        }
+
+        cur = conn.cursor()
+        cur.execute(sql, {"statefp": statefp, "cd113fp": cd113fp}); 
+        for row in cur:
+            ret['state']['counties'].append(state_id + "/county/" + row[1])
+    
+        return ret
+
+class GeoHandler(tornado.web.RequestHandler):
+    def get(self, lookup, extra, method, **kwargs):
+        ret = None
+        klass = None
+        if lookup == "congressional-district":
+            klass = CD
+        elif lookup == "state":
+            klass = State
+
+        if klass == None:
+            ret = {"error_code": 400, "error": "How'd you get here?"}
+        elif  method in klass.methods():
+            ret = getattr(klass, method)(**kwargs)
+        elif method == None:
+            ret = klass.lookup(**kwargs)
+        else:
+            ret = {"error_code": 404, "error": method + " is not valid"}
+
+        if "error_code" in ret:
+            self.send_error(ret['error_code'])
+            self.write(json.dumps(ret))
+            return
+        self.set_status(200)
+        self.set_header("Content-type", "application/json; charset=utf-8")
+        return self.write(json.dumps(ret))
+        
+
+FLOAT = "[-+]?\d+\.\d+"
+application = tornado.web.Application([
+    (r"^/(?P<lookup>state)/(?P<statefp>\d+)(?P<extra>/(?P<method>.+))?$", GeoHandler),
+    (r"^/state/(?P<statefp>\d+)/(?P<lookup>congressional-district)/(?P<cd113fp>\d+)(?P<extra>/(?P<method>.+))?$", GeoHandler),
+    (r"^/point/(?P<lat>"+FLOAT+")\s*,\s*(?P<lon>" + FLOAT + ")$", PointLookup),
+])
+
+application.listen(8000)
+tornado.ioloop.IOLoop.instance().start()
