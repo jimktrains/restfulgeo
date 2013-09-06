@@ -20,9 +20,7 @@ def by_point(point, conn):
         'id':  state_id,
         'county': {
             'id': county_id,
-            'subdivision': {
-                'id':      cousub_id,
-            }
+            'subdivision': cousub_id,
         }
     }
     return ret

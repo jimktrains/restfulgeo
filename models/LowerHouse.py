@@ -15,9 +15,7 @@ def by_point(point, conn):
     ret = {
         'state': {
             'id': state_id,
-            'lower-house-district': {
-                'id': cd_id,
-            }
+            'lower-house-district': cd_id,
         }
     }
     

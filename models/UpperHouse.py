@@ -12,14 +12,12 @@ def by_point(point, conn):
     cdfp = row[1]
 
     state_id = "/state/" + statefp;
-    cd_id = state_id + "/lower-house-district/" + cdfp
+    cd_id = state_id + "/upper-house-district/" + cdfp
 
     ret = {
         'state': {
             'id': state_id,
-            'lower-house-district': {
-                'id': cd_id,
-            }
+            'upper-house-district': cd_id,
         }
     }
     

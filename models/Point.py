@@ -14,6 +14,8 @@ def lookup(lat, lon, conn):
     ret = models.Point.dmerge(ret, models.CongressionalDistrict.by_point(point, conn))
     ret = models.Point.dmerge(ret, models.CountySubdivision.by_point(point, conn))
     ret = models.Point.dmerge(ret, models.SchoolDistrict.by_point(point, conn))
+    ret = models.Point.dmerge(ret, models.LowerHouse.by_point(point, conn))
+    ret = models.Point.dmerge(ret, models.UpperHouse.by_point(point, conn))
 
     return ret
 
