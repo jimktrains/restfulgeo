@@ -1,4 +1,5 @@
 __all__ = [
+    'Address',
     'CongressionalDistrict',
     'County',
     'CountySubdivision',

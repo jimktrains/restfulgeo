@@ -4,6 +4,7 @@ import re
 import tornado.ioloop
 import tornado.web
 import fips
+from geocoder import *
 from models import *
 
 lookup_to_class = {
@@ -12,6 +13,7 @@ lookup_to_class = {
     'subdivision': CountySubdivision,
     'lower-house-district': LowerHouse,
     'point': Point,
+    'address': Address,
     'school-district': SchoolDistrict,
     'state': State,
     'upper-house-district': UpperHouse
@@ -77,6 +79,7 @@ application = tornado.web.Application([
     (r"^/state/(?P<statefp>\d+)/(?P<lookup>upper-house-district)/(?P<sldust>\d+)(?P<extra>/(?P<method>.+))?$", GeoHandler,dict(conn=conn)),
     (r"^/state/(?P<statefp>\d+)/(?P<lookup>school-district)/(?P<unsdlea>\d+)(?P<extra>/(?P<method>.+))?$", GeoHandler,dict(conn=conn)),
     (r"^/(?P<lookup>state)/(?P<statefp>\d+)(?P<extra>/(?P<method>.+))?$", GeoHandler,dict(conn=conn)),
+    (r"^/(?P<lookup>address)/(?P<address>.+)(?P<extra>/(?P<method>.+))?$", GeoHandler,dict(conn=conn)),
     (r"^/(?P<key>funcstat|classfp|lsad|mtfcc)(?P<extra>/(?P<val>.*))?", FIPSHandler)
 ])
 
