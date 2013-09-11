@@ -11,6 +11,25 @@ base_fields = None
 with open(filename, 'r') as f:
     base_fields = json.loads(f.read())
 
+def format_ids(data, prefix = None):
+    if prefix is None:
+        prefix = ''
+    if type(data) is list:
+        for i in range(len(data)):
+            data[i]['id'] = prefix + '/' + data[i]['id']
+            if 'fields' in data[i]:
+                data[i]['fields'] = format_ids(data[i]['fields'], data[i]['id'])
+    elif type(data) is dict:
+        for i in list(data.keys()):
+            ids = prefix + '/' + i
+            data[ids] = data[i]
+            del data[i]
+            if 'fields' in data[ids]:
+                data[ids]['fields'] = format_ids(data[ids]['fields'], ids)
+            else:
+                data[ids] = format_ids(data[ids], ids)
+    return data
+
 def fields_to_names(fields, fid, val):
     for field in fields:
         if field['id'].upper() == fid.upper():
@@ -109,17 +128,24 @@ def get_stat_no_copy(table, fields, statefp, countyfp, cousubfp, conn):
         conn.rollback()
 
 def get_stat_by_cat(conn, statefp, cat, countyfp = None, cousubfp = None):
-    if cousubfp is None:
-        cousubfp = ''
-    if countyfp is None:
+    prefix = "/state/%s" % statefp
+    if countyfp is None or countyfp == '':
         countyfp = ''
+    else:
+        prefix += ("/county/%s" % countyfp)
+    if cousubfp is None or cousubfp == '':
+        cousubfp = ''
+    else:
+        prefix += ("/subdivision/%s" % cousubfp)
     fields = deepcopy(base_fields)
     for c in list(fields.keys()):
         if c != cat:
             del fields[c]
     for table in fields[cat]:
         get_stat_no_copy(table=table, fields=fields[cat][table]['fields'], statefp=statefp, countyfp=countyfp, cousubfp=cousubfp, conn=conn)
-    return fields
+    # This may be the shittiest way to build urls:-\
+    prefix += "/acs2010-5e"
+    return format_ids(fields, prefix)
 
 def get_stat_by_table(conn, statefp, cat, table, countyfp = None, cousubfp = None):
     if cousubfp is None:
