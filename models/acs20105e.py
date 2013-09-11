@@ -86,6 +86,58 @@ def get_stat(conn, stat, fields, statefp, countyfp = None, cousubfp = None):
 
 
 #conn = psycopg2.connect("dbname=jim user=jim password=jim")
+def get_one_stat(conn, stat, statefp, countyfp = None, cousubfp = None):
+    if cousubfp is None:
+        cousubfp = ''
+    if countyfp is None:
+        countyfp = ''
+
+    if type(stat) is str:
+        stat = (stat,)
+    if len(stat) == 1:
+        return get_stat_by_cat(conn=conn, cat=stat[0], statefp=statefp, countyfp=countyfp, cousubfp=cousubfp)
+    else:
+        return get_stat_by_table(conn=conn, cat=stat[0], table=stat[1], statefp=statefp, countyfp=countyfp, cousubfp=cousubfp)
+
+def get_stat_no_copy(table, fields, statefp, countyfp, cousubfp, conn):
+    try:
+        get_stat(stat=table, fields=fields, statefp=statefp, countyfp=countyfp, cousubfp=cousubfp, conn=conn)
+    except psycopg2.ProgrammingError as e:
+        print(e, file=sys.stderr)
+    except Exception as e:
+        print(e, file=sys.stderr)
+        conn.rollback()
+
+def get_stat_by_cat(conn, statefp, cat, countyfp = None, cousubfp = None):
+    if cousubfp is None:
+        cousubfp = ''
+    if countyfp is None:
+        countyfp = ''
+    fields = deepcopy(base_fields)
+    for c in list(fields.keys()):
+        if c != cat:
+            del fields[c]
+    for table in fields[cat]:
+        get_stat_no_copy(table=table, fields=fields[cat][table]['fields'], statefp=statefp, countyfp=countyfp, cousubfp=cousubfp, conn=conn)
+    return fields
+
+def get_stat_by_table(conn, statefp, cat, table, countyfp = None, cousubfp = None):
+    if cousubfp is None:
+        cousubfp = ''
+    if countyfp is None:
+        countyfp = ''
+    fields = deepcopy(base_fields)
+    x = {}
+    for c in list(fields.keys()):
+        if c != cat:
+            del fields[c]
+        else:
+            for i in list(fields[c].keys()):
+                if i != table:
+                    del fields[c][i]
+    get_stat_no_copy(table=table, fields=fields[cat][table]['fields'], statefp=statefp, countyfp=countyfp, cousubfp=cousubfp, conn=conn)
+    return fields
+
 def get_all_stats(conn, statefp, countyfp = None, cousubfp = None):
     if cousubfp is None:
         cousubfp = ''
@@ -94,11 +146,5 @@ def get_all_stats(conn, statefp, countyfp = None, cousubfp = None):
     fields = deepcopy(base_fields)
     for cat in fields:
         for table in fields[cat]:
-            try:
-                get_stat(stat=table, fields=fields[cat][table]['fields'], statefp='42', countyfp='003', cousubfp='', conn=conn)
-            except psycopg2.ProgrammingError as e:
-                print(e, file=sys.stderr)
-            except Exception as e:
-                print(e, file=sys.stderr)
-                conn.rollback()
+            get_stat_no_copy(table=table, fields=fields[cat][table]['fields'], statefp=statefp, countyfp=countyfp, cousubfp=cousubfp, conn=conn)
     return fields

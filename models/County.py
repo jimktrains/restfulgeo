@@ -64,8 +64,12 @@ def lookup(statefp, countyfp, conn):
 def methods():
     return ['school-districts','congressional-districts', 'lower-house-districts', 'upper-house-districts', 'subdivisions', 'acs2010-5e']
 
-def acs2010_5e(statefp, countyfp, conn):
-    return models.acs20105e.get_all_stats(statefp=statefp, countyfp=countyfp, conn=conn)
+def acs2010_5e(statefp, countyfp, conn, extra = None):
+    if extra is None:
+        return models.acs20105e.get_all_stats(statefp=statefp, countyfp=countyfp, conn=conn)
+    else:
+        
+        return models.acs20105e.get_one_stat(statefp=statefp, countyfp=countyfp, stat=extra, conn=conn)
 
 def subdivisions(statefp, countyfp, conn):
     sql = "SELECT sd.statefp, sd.cousubfp, sd.countyfp \

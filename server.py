@@ -36,6 +36,11 @@ class GeoHandler(tornado.web.RequestHandler):
 
         kwargs['conn'] = self.conn
 
+        if method.find("/") > -1:
+            x = method.split("/",1)
+            method = x[0]
+            extra = x[1].split("/")
+            kwargs['extra'] = extra
         
         if klass == None:
             ret = {"error_code": 400, "error": "How'd you get here?"}
