@@ -148,10 +148,15 @@ def get_stat_by_cat(conn, statefp, cat, countyfp = None, cousubfp = None):
     return format_ids(fields, prefix)
 
 def get_stat_by_table(conn, statefp, cat, table, countyfp = None, cousubfp = None):
-    if cousubfp is None:
-        cousubfp = ''
-    if countyfp is None:
+    prefix = "/state/%s" % statefp
+    if countyfp is None or countyfp == '':
         countyfp = ''
+    else:
+        prefix += ("/county/%s" % countyfp)
+    if cousubfp is None or cousubfp == '':
+        cousubfp = ''
+    else:
+        prefix += ("/subdivision/%s" % cousubfp)
     fields = deepcopy(base_fields)
     x = {}
     for c in list(fields.keys()):
@@ -162,15 +167,22 @@ def get_stat_by_table(conn, statefp, cat, table, countyfp = None, cousubfp = Non
                 if i != table:
                     del fields[c][i]
     get_stat_no_copy(table=table, fields=fields[cat][table]['fields'], statefp=statefp, countyfp=countyfp, cousubfp=cousubfp, conn=conn)
-    return fields
+    prefix += "/acs2010-5e"
+    return format_ids(fields, prefix)
 
 def get_all_stats(conn, statefp, countyfp = None, cousubfp = None):
-    if cousubfp is None:
-        cousubfp = ''
-    if countyfp is None:
+    prefix = "/state/%s" % statefp
+    if countyfp is None or countyfp == '':
         countyfp = ''
+    else:
+        prefix += ("/county/%s" % countyfp)
+    if cousubfp is None or cousubfp == '':
+        cousubfp = ''
+    else:
+        prefix += ("/subdivision/%s" % cousubfp)
     fields = deepcopy(base_fields)
     for cat in fields:
         for table in fields[cat]:
             get_stat_no_copy(table=table, fields=fields[cat][table]['fields'], statefp=statefp, countyfp=countyfp, cousubfp=cousubfp, conn=conn)
-    return fields
+    prefix += "/acs2010-5e"
+    return format_ids(fields, prefix)

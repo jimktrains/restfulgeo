@@ -18,6 +18,17 @@ lookup_to_class = {
     'state': State,
     'upper-house-district': UpperHouse
 }
+lookup_to_type = {
+    'congressional-district': 'congressional-district',
+    'county': 'county',
+    'subdivision': 'county-subdivision',
+    'lower-house-district': 'state-lower-house',
+    'point': 'point',
+    'address': 'point',
+    'school-district': 'school-district',
+    'state': 'state',
+    'upper-house-district': 'state-upper-house' 
+}
 
 PORT = 8000
 
@@ -30,13 +41,16 @@ class GeoHandler(tornado.web.RequestHandler):
     def get(self, lookup, extra, method, **kwargs):
         ret = None
         klass = None
+        types = None
 
         if lookup in lookup_to_class:
             klass = lookup_to_class[lookup]
+        if lookup in lookup_to_type:
+            types = lookup_to_type[lookup]
 
         kwargs['conn'] = self.conn
 
-        if method.find("/") > -1:
+        if method is not None and method.find("/") > -1:
             x = method.split("/",1)
             method = x[0]
             extra = x[1].split("/")
@@ -55,7 +69,8 @@ class GeoHandler(tornado.web.RequestHandler):
             self.send_error(ret['error_code'])
             return
         self.set_status(200)
-        self.set_header("Content-type", "application/json; charset=utf-8")
+        self.set_header("Content-type", "x-resfulgeo/x-%s" % (types,)) 
+        self.set_header("Content-encoding", "application/json; charset=utf-8")
         return self.write(json.dumps(ret))
 
 class FIPSHandler(tornado.web.RequestHandler):
@@ -72,7 +87,8 @@ class FIPSHandler(tornado.web.RequestHandler):
             self.send_error(ret['error_code'])
             return
         self.set_status(200)
-        self.set_header("Content-type", "application/json; charset=utf-8")
+        self.set_header("Content-type", "x-resfulgeo/x-fips-%s" % (key,)) 
+        self.set_header("Content-encoding", "application/json; charset=utf-8")
         return self.write(json.dumps(ret))
 FLOAT = "[-+]?\d+\.\d+"
 application = tornado.web.Application([
@@ -88,5 +104,8 @@ application = tornado.web.Application([
     (r"^/(?P<key>funcstat|classfp|lsad|mtfcc)(?P<extra>/(?P<val>.*))?", FIPSHandler)
 ])
 
-application.listen(8000)
+port = 8000
+
+application.listen(port)
+print("Listening on %d" % port)
 tornado.ioloop.IOLoop.instance().start()
