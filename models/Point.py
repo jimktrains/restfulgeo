@@ -4,6 +4,9 @@ def dmerge(a, b):
     for k, v in b.items():
         if isinstance(v, dict) and k in a:
             dmerge(a[k], v)
+        elif isinstance(v, list) and k in a:
+            for i in v:
+                a[k].append(i)
         else:
             a[k] = v 
     return a

@@ -1,12 +1,13 @@
+import psycopg2.extras
 import models 
 
 def by_point(point, conn):
     sql = "SELECT statefp, countyfp \
           FROM tl_2013_us_county \
           WHERE ST_Contains(geom, ST_GeomFromText('POINT(%(lon)s %(lat)s)'))";
-    cur = conn.cursor()
-    cur.execute(sql, point);
-    row = cur.fetchone()
+    with conn.cursor() as cur:
+        cur.execute(sql, point);
+        row = cur.fetchone()
 
     ret = {}
 
@@ -20,7 +21,7 @@ def by_point(point, conn):
     ret['state'] = {
         'id':  state_id,
         'county': {
-            'id': county_id,
+            [county_id,]
         }
     }
     return ret
@@ -29,11 +30,14 @@ def lookup(statefp, countyfp, conn):
     sql = "SELECT statefp, countyfp, name, lsad, mtfcc, funcstat \
           FROM tl_2013_us_county \
           WHERE statefp = %(statefp)s AND countyfp = %(countyfp)s "
-    cur = conn.cursor()
-    cur.execute(sql, {'statefp':statefp, 'countyfp': countyfp})
-    row = cur.fetchone()
+    with conn.cursor() as cur:
+        cur.execute(sql, {'statefp':statefp, 'countyfp': countyfp})
+        row = cur.fetchone()
 
     ret = {}
+
+    if row is None:
+        raise models.NotFound.NotFound('county', {'statefp':statefp, 'countyfp':countyfp})
 
     statefp = row[0]
     countyfp = row[1]
@@ -45,19 +49,23 @@ def lookup(statefp, countyfp, conn):
     state_id = "/state/" + statefp;
     county_id = state_id + "/county/" + countyfp;
 
-    ret['state'] = {
-        'id':  state_id,
-        'county': {
-            'id': county_id,
-            'name':    name,
-            'mtfcc':    "/mtfcc/" + mtfcc,
-            'lsad':     "/lsad/" + lsad,
-            'functional_status': "/funcstat/" + funcstat,
+    ret = {
+        'state': {
+            state_id:{
+                'county': {
+                    county_id: {
+                        'name':    name,
+                        'mtfcc':    "/mtfcc/" + mtfcc,
+                        'lsad':     "/lsad/" + lsad,
+                        'functional_status': "/funcstat/" + funcstat,
+                    }
+                }
+            }
         }
     }
 
     for method in models.County.methods():
-        ret['state']['county'][method] = ret['state']['county']['id'] + "/" + method
+        ret['state'][state_id]['county'][county_id][method] = county_id + "/" + method
 
     return ret
 
@@ -80,10 +88,12 @@ def subdivisions(statefp, countyfp, conn):
     county_id = state_id + "/county/" + countyfp
     ret = {
         "state": {
-            "id": state_id,
-            "county": {
-                "id": county_id,
-                "subdivisions": [],
+            state_id: {
+                "county": {
+                    county_id: {
+                        "subdivisions": [],
+                    }
+                }
             }
         }
     }
@@ -91,7 +101,7 @@ def subdivisions(statefp, countyfp, conn):
     cur = conn.cursor()
     cur.execute(sql, {"statefp": statefp, "countyfp": countyfp}); 
     for row in cur:
-        ret['state']['county']['subdivisions'].append(county_id + "/subdivision/" + row[1])
+        ret['state'][state_id]['county'][county_id]['subdivisions'].append(county_id + "/subdivision/" + row[1])
 
     return ret
 def upper_house_districts(statefp, countyfp, conn):
@@ -103,16 +113,16 @@ def upper_house_districts(statefp, countyfp, conn):
     county_id = state_id + "/county/" + countyfp
     ret = {
         "state": {
-            "id": state_id,
-            "county": county_id,
-            "upper-house-districts": [],
+            state_id: {
+                "upper-house-districts": [],
+            }
         }
     }
 
     cur = conn.cursor()
     cur.execute(sql, {"statefp": statefp, "countyfp": countyfp}); 
     for row in cur:
-        ret['state']['upper-house-districts'].append(state_id + "/upper-house-district/" + row[1])
+        ret['state'][state_id]['upper-house-districts'].append(state_id + "/upper-house-district/" + row[1])
 
     return ret
 def lower_house_districts(statefp, countyfp, conn):
@@ -124,16 +134,16 @@ def lower_house_districts(statefp, countyfp, conn):
     county_id = state_id + "/county/" + countyfp
     ret = {
         "state": {
-            "id": state_id,
-            "county": county_id,
-            "lower-house-districts": [],
+            state_id: {
+                "lower-house-districts": [],
+            }
         }
     }
 
     cur = conn.cursor()
     cur.execute(sql, {"statefp": statefp, "countyfp": countyfp}); 
     for row in cur:
-        ret['state']['lower-house-districts'].append(state_id + "/lower-house-district/" + row[1])
+        ret['state'][state_id]['lower-house-districts'].append(state_id + "/lower-house-district/" + row[1])
 
     return ret
 def congressional_districts(statefp, countyfp, conn):
@@ -145,16 +155,16 @@ def congressional_districts(statefp, countyfp, conn):
     county_id = state_id + "/county/" + countyfp
     ret = {
         "state": {
-            "id": state_id,
-            "county": county_id,
-            "congressional-districts": [],
+            state_id: {
+                "congressional-districts": [],
+            }
         }
     }
 
     cur = conn.cursor()
     cur.execute(sql, {"statefp": statefp, "countyfp": countyfp}); 
     for row in cur:
-        ret['state']['congressional-districts'].append(state_id + "/congressional-district/" + row[1])
+        ret['state'][state_id]['congressional-districts'].append(state_id + "/congressional-district/" + row[1])
 
     return ret
 
@@ -167,15 +177,15 @@ def school_districts(statefp, countyfp, conn):
     county_id = state_id + "/county/" + countyfp
     ret = {
         "state": {
-            "id": state_id,
-            "county": county_id,
-            "school-districts": []
+            state_id: {
+                "school-districts": []
+            }
         }
     }
 
     cur = conn.cursor()
     cur.execute(sql, {"statefp": statefp, "countyfp": countyfp}); 
     for row in cur:
-        ret['state']['school-districts'].append(state_id + "/school-districts/" + row[1])
+        ret['state'][state_id]['school-districts'].append(state_id + "/school-districts/" + row[1])
 
     return ret

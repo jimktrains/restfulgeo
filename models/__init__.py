@@ -1,4 +1,5 @@
 __all__ = [
+    'NotFound',
     'acs20105e',
     'Address',
     'CongressionalDistrict',
