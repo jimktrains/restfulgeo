@@ -4,9 +4,9 @@ def by_point(point, conn):
     sql = "SELECT  statefp, unsdlea \
           FROM tl_2013_42_unsd \
           WHERE ST_Contains(geom, ST_GeomFromText('POINT(%(lon)s %(lat)s)'))"
-    cur = conn.cursor()
-    cur.execute(sql, point)
-    row = cur.fetchone()
+    with conn.cursor() as cur:
+        cur.execute(sql, point)
+        row = cur.fetchone()
 
     statefp = row[0]
     unsdlea = row[1]
@@ -17,8 +17,9 @@ def by_point(point, conn):
 
     ret = {
         'state':{
-            'id': state_id,
-            'school-district': unsdlea_id,
+            state_id: {
+                'school-district': unsdlea_id,
+            }
         }
     }
 
@@ -28,9 +29,9 @@ def lookup(statefp, unsdlea, conn):
     sql = "SELECT  statefp, unsdlea, name, lsad, lograde, higrade, mtfcc, sdtyp, funcstat \
           FROM tl_2013_42_unsd \
           WHERE statefp = %(statefp)s AND unsdlea = %(unsdlea)s"
-    cur = conn.cursor()
-    cur.execute(sql, {'statefp': statefp, 'unsdlea': unsdlea})
-    row = cur.fetchone()
+    with conn.cursor() as cur:
+        cur.execute(sql, {'statefp': statefp, 'unsdlea': unsdlea})
+        row = cur.fetchone()
 
     statefp = row[0]
     unsdlea = row[1]

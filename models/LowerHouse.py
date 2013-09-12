@@ -2,9 +2,9 @@ def by_point(point, conn):
     sql = "SELECT  statefp, sldlst \
           FROM  tl_2013_42_sldl\
           WHERE ST_Contains(geom, ST_GeomFromText('POINT(%(lon)s %(lat)s)'))"
-    cur = conn.cursor()
-    cur.execute(sql, point)
-    row = cur.fetchone()
+    with conn.cursor() as cur:
+        cur.execute(sql, point)
+        row = cur.fetchone()
 
     statefp = row[0]
     cdfp = row[1]
@@ -14,8 +14,9 @@ def by_point(point, conn):
 
     ret = {
         'state': {
-            'id': state_id,
-            'lower-house-district': cd_id,
+            state_id: {
+                'lower-house-district': cd_id,
+            }
         }
     }
     
@@ -28,9 +29,9 @@ def lookup(statefp, sldlst, conn):
     state_id = "/state/" + statefp
     lh_id = state_id + "/lower-house-district/" + sldlst
     
-    cur = conn.cursor()
-    cur.execute(sql, {'statefp':statefp, 'sldlst':sldlst}); 
-    row = cur.fetchone()
+    with conn.cursor() as cur:
+        cur.execute(sql, {'statefp':statefp, 'sldlst':sldlst}); 
+        row = cur.fetchone()
 
     lsad = row[2]
     mtfcc = row[3]
@@ -38,13 +39,15 @@ def lookup(statefp, sldlst, conn):
 
     ret = {
         'state': {
-            "id": state_id,
-            "lower-house-district": {
-                'id': lh_id,
-                'lsad': "/lsad/" + lsad,
-                'mtfcc': "/mtfcc/" + mtfcc,
-                'lsad': "/funcstat/" + funcstat,
-            },
+            state_id: {
+                "lower-house-district": {
+                    lh_id: {
+                        'lsad': "/lsad/" + lsad,
+                        'mtfcc': "/mtfcc/" + mtfcc,
+                        'lsad': "/funcstat/" + funcstat,
+                    }
+                }
+            }
         }
     }
 
@@ -62,15 +65,15 @@ def counties(statefp, sldlst, conn):
     sldlst_id = state_id + "/lower-house-district/" + sldlst
     ret = {
         "state": {
-            "id": state_id,
-            "counties": [],
-            "lower-house-district": sldlst_id,
+            state_id: {
+                "counties": [],
+            }
         }
     }
 
-    cur = conn.cursor()
-    cur.execute(sql, {"statefp": statefp, "sldlst": sldlst }); 
-    for row in cur:
-        ret['state']['counties'].append(state_id + "/county/" + row[1])
+    with conn.cursor() as cur:
+        cur.execute(sql, {"statefp": statefp, "sldlst": sldlst }); 
+        for row in cur:
+            ret['state'][state_id]['counties'].append(state_id + "/county/" + row[1])
 
     return ret
